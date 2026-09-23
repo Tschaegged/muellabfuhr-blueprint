@@ -5,16 +5,17 @@ blueprint:
     # 🗑️ Müllabfuhr-Erinnerung mit Bestätigung
 
     Erinnert abends wenn morgen Müll abgeholt wird und wiederholt die
-    Benachrichtigung bis jemand per Klick bestätigt, die Tonne rausgestellt zu haben.
-    Companion-App-Geräte erhalten einen **Bestätigungs-Button** direkt in der
-    Benachrichtigung. Telegram und andere Dienste erhalten die Textnachricht.
+    Benachrichtigung bis jemand bestätigt.
+
+    - **Telegram-Empfänger** erhalten einen Inline-Button direkt im Chat.
+    - **Companion-App-Geräte** erhalten eine Benachrichtigung mit Bestätigungs-Action.
+    - Wer auch immer bestätigt – alle weiteren Erinnerungen stoppen.
 
     Optional: Morgen-Erinnerung, falls bis zum Abholtag keine Bestätigung erfolgte.
 
     **Voraussetzungen:**
     - Einen `input_boolean`-Helfer anlegen, z. B. `tonne_rausgestellt`
       (Einstellungen → Geräte & Dienste → Helfer → Helfer hinzufügen → Schalter)
-    - Eine Bedingung konfigurieren, die anzeigt ob morgen/heute Müll abgeholt wird
   domain: automation
   author: Claude
   homeassistant:
@@ -27,7 +28,6 @@ blueprint:
       input:
         notification_time:
           name: Uhrzeit der ersten Erinnerung
-          description: Abends, bevor die Tonne rausgestellt werden muss.
           default: "18:00:00"
           selector:
             time: {}
@@ -36,14 +36,12 @@ blueprint:
           name: Bedingung – Abholung morgen?
           description: >
             Template das `true` zurückgibt wenn morgen Müll abgeholt wird.
-            Standard passt für Sensoren mit "keine" im Text wenn kein Termin.
           default: "{{ 'keine' not in states('sensor.mullabholung_morgen') | lower }}"
           selector:
             template: {}
 
         max_repeats:
           name: Max. Wiederholungen (abends)
-          description: Nach wie vielen unbestätigten Erinnerungen abends aufhören?
           default: 4
           selector:
             number:
@@ -70,7 +68,7 @@ blueprint:
           name: Benachrichtigungsempfänger
           description: >
             Alle Geräte/Dienste die benachrichtigt werden sollen.
-            Companion-App-Geräte erhalten einen Bestätigungs-Button in der Nachricht.
+            Companion-App- und Telegram-Empfänger erhalten automatisch einen Bestätigungs-Button.
           selector:
             entity:
               domain: notify
@@ -84,9 +82,6 @@ blueprint:
 
         notification_message:
           name: Nachrichtentext (Template möglich)
-          description: >
-            Zeigt an was rausgestellt werden muss. Jinja2-Templates werden ausgewertet,
-            z. B. `{{ states('sensor.nachste_abholung_2') }}`.
           default: "{{ states('sensor.nachste_abholung_2') }}"
           selector:
             template: {}
@@ -99,7 +94,6 @@ blueprint:
           name: Bestätigungs-Helfer
           description: >
             input_boolean der auf EIN gesetzt wird sobald jemand bestätigt hat.
-            Muss vorher als Helfer angelegt werden (z. B. input_boolean.tonne_rausgestellt).
           selector:
             entity:
               domain: input_boolean
@@ -111,29 +105,24 @@ blueprint:
       input:
         morning_reminder:
           name: Morgen-Erinnerung aktivieren
-          description: Weitere Erinnerung am Abholtag selbst, falls noch nicht bestätigt.
           default: true
           selector:
             boolean: {}
 
         morning_time:
           name: Uhrzeit (Morgen)
-          description: Zu dieser Zeit wird am Abholtag erinnert wenn noch nicht bestätigt.
           default: "07:00:00"
           selector:
             time: {}
 
         morgen_bedingung:
           name: Bedingung – Abholung heute?
-          description: >
-            Template das `true` zurückgibt wenn heute Müll abgeholt wird.
           default: "{{ 'keine' not in states('sensor.mullabholung_heute') | lower }}"
           selector:
             template: {}
 
         morning_max_repeats:
           name: Max. Wiederholungen (morgens)
-          description: Wie oft morgens maximal erinnern?
           default: 2
           selector:
             number:
@@ -153,21 +142,19 @@ blueprint:
               unit_of_measurement: min
 
 variables:
-  _action_id: >
-    {{ 'MUELL_' ~ (this.entity_id
-        | replace('automation.', '')
-        | upper
-        | replace('-', '_')
-        | replace(' ', '_')) ~ '_OK' }}
-  _tag: "muell_{{ this.entity_id | replace('.', '_') }}"
   _title: !input notification_title
-  _confirmed: !input confirmed_boolean
-  _targets: !input notify_targets
+  _msg: !input notification_message
   _max: !input max_repeats
   _interval: !input repeat_interval
   _morning: !input morning_reminder
   _morning_max: !input morning_max_repeats
   _morning_int: !input morning_interval
+  # Telegram: Button-Text = callback_data (HA sendet die gesamte Zeichenkette)
+  _tg_callback: "✓ Tonne rausgestellt"
+  # Companion App: Action-ID für mobile_app_notification_action
+  _app_action: "MUELL_ERINNERUNG_OK"
+  # Notification-Tag für Companion App (zum Ersetzen der Nachricht)
+  _tag: "muell_erinnerung"
 
 triggers:
   - trigger: time
@@ -203,22 +190,54 @@ actions:
                 - repeat:
                     for_each: !input notify_targets
                     sequence:
-                      - action: "{{ repeat.item }}"
-                        data:
-                          title: "{{ _title }}"
-                          message: !input notification_message
-                          data:
-                            tag: "{{ _tag }}"
-                            sticky: "true"
-                            actions:
-                              - action: "{{ _action_id }}"
-                                title: "✓ Tonne rausgestellt"
+                      - choose:
+                          # Telegram → Inline-Button
+                          - conditions:
+                              - condition: template
+                                value_template: "{{ 'telegram_bot' in repeat.item }}"
+                            sequence:
+                              - action: telegram_bot.send_message
+                                data:
+                                  entity_id: "{{ repeat.item }}"
+                                  message: "🗑 {{ _title }}\n{{ _msg }}"
+                                  parse_mode: plain_text
+                                  inline_keyboard:
+                                    - "{{ _tg_callback }}"
+                          # Companion App (mobile_app) → Action-Button via Legacy-Service
+                          - conditions:
+                              - condition: template
+                                value_template: "{{ repeat.item in integration_entities('mobile_app') }}"
+                            sequence:
+                              - action: >
+                                  notify.mobile_app_{{ device_attr(device_id(repeat.item), 'name')
+                                    | lower | replace('+', '') | replace(' ', '_') }}
+                                data:
+                                  title: "{{ _title }}"
+                                  message: "{{ _msg }}"
+                                  data:
+                                    tag: "{{ _tag }}"
+                                    sticky: true
+                                    actions:
+                                      - action: "{{ _app_action }}"
+                                        title: "✓ Tonne rausgestellt"
+                        # Alle anderen → normaler notify
+                        default:
+                          - action: notify.send_message
+                            target:
+                              entity_id: "{{ repeat.item }}"
+                            data:
+                              title: "{{ _title }}"
+                              message: "{{ _msg }}"
 
                 - wait_for_trigger:
                     - trigger: event
+                      event_type: telegram_callback
+                      event_data:
+                        data: "{{ _tg_callback }}"
+                    - trigger: event
                       event_type: mobile_app_notification_action
                       event_data:
-                        action: "{{ _action_id }}"
+                        action: "{{ _app_action }}"
                   timeout:
                     minutes: "{{ _interval | int }}"
                   continue_on_timeout: true
@@ -230,15 +249,46 @@ actions:
                     - action: input_boolean.turn_on
                       target:
                         entity_id: !input confirmed_boolean
+                    - if:
+                        - condition: template
+                          value_template: "{{ wait.trigger.event.event_type == 'telegram_callback' }}"
+                      then:
+                        - action: telegram_bot.answer_callback_query
+                          data:
+                            callback_query_id: "{{ wait.trigger.event.data.id }}"
+                            message: "✅ Tonne ist raus!"
                     - repeat:
                         for_each: !input notify_targets
                         sequence:
-                          - action: "{{ repeat.item }}"
-                            data:
-                              title: "✅ Tonne ist raus!"
-                              message: "Bestätigung erhalten – Danke!"
-                              data:
-                                tag: "{{ _tag }}"
+                          - choose:
+                              - conditions:
+                                  - condition: template
+                                    value_template: "{{ 'telegram_bot' in repeat.item }}"
+                                sequence:
+                                  - action: telegram_bot.send_message
+                                    data:
+                                      entity_id: "{{ repeat.item }}"
+                                      message: "✅ Tonne ist raus! Bestätigung erhalten – Danke!"
+                                      parse_mode: plain_text
+                              - conditions:
+                                  - condition: template
+                                    value_template: "{{ repeat.item in integration_entities('mobile_app') }}"
+                                sequence:
+                                  - action: >
+                                      notify.mobile_app_{{ device_attr(device_id(repeat.item), 'name')
+                                        | lower | replace('+', '') | replace(' ', '_') }}
+                                    data:
+                                      title: "✅ Tonne ist raus!"
+                                      message: "Bestätigung erhalten – Danke!"
+                                      data:
+                                        tag: "{{ _tag }}"
+                            default:
+                              - action: notify.send_message
+                                target:
+                                  entity_id: "{{ repeat.item }}"
+                                data:
+                                  title: "✅ Tonne ist raus!"
+                                  message: "Bestätigung erhalten – Danke!"
 
       # ── MORGEN: Abholung heute, noch nicht bestätigt ───────────────────────
       - conditions:
@@ -263,22 +313,51 @@ actions:
                 - repeat:
                     for_each: !input notify_targets
                     sequence:
-                      - action: "{{ repeat.item }}"
-                        data:
-                          title: "⚠️ {{ _title }}"
-                          message: !input notification_message
-                          data:
-                            tag: "{{ _tag }}"
-                            sticky: "true"
-                            actions:
-                              - action: "{{ _action_id }}"
-                                title: "✓ Tonne rausgestellt"
+                      - choose:
+                          - conditions:
+                              - condition: template
+                                value_template: "{{ 'telegram_bot' in repeat.item }}"
+                            sequence:
+                              - action: telegram_bot.send_message
+                                data:
+                                  entity_id: "{{ repeat.item }}"
+                                  message: "⚠️ {{ _title }}\n{{ _msg }}"
+                                  parse_mode: plain_text
+                                  inline_keyboard:
+                                    - "{{ _tg_callback }}"
+                          - conditions:
+                              - condition: template
+                                value_template: "{{ repeat.item in integration_entities('mobile_app') }}"
+                            sequence:
+                              - action: >
+                                  notify.mobile_app_{{ device_attr(device_id(repeat.item), 'name')
+                                    | lower | replace('+', '') | replace(' ', '_') }}
+                                data:
+                                  title: "⚠️ {{ _title }}"
+                                  message: "{{ _msg }}"
+                                  data:
+                                    tag: "{{ _tag }}"
+                                    sticky: true
+                                    actions:
+                                      - action: "{{ _app_action }}"
+                                        title: "✓ Tonne rausgestellt"
+                        default:
+                          - action: notify.send_message
+                            target:
+                              entity_id: "{{ repeat.item }}"
+                            data:
+                              title: "⚠️ {{ _title }}"
+                              message: "{{ _msg }}"
 
                 - wait_for_trigger:
                     - trigger: event
+                      event_type: telegram_callback
+                      event_data:
+                        data: "{{ _tg_callback }}"
+                    - trigger: event
                       event_type: mobile_app_notification_action
                       event_data:
-                        action: "{{ _action_id }}"
+                        action: "{{ _app_action }}"
                   timeout:
                     minutes: "{{ _morning_int | int }}"
                   continue_on_timeout: true
@@ -290,15 +369,46 @@ actions:
                     - action: input_boolean.turn_on
                       target:
                         entity_id: !input confirmed_boolean
+                    - if:
+                        - condition: template
+                          value_template: "{{ wait.trigger.event.event_type == 'telegram_callback' }}"
+                      then:
+                        - action: telegram_bot.answer_callback_query
+                          data:
+                            callback_query_id: "{{ wait.trigger.event.data.id }}"
+                            message: "✅ Tonne ist raus!"
                     - repeat:
                         for_each: !input notify_targets
                         sequence:
-                          - action: "{{ repeat.item }}"
-                            data:
-                              title: "✅ Tonne ist raus!"
-                              message: "Bestätigung erhalten – Danke!"
-                              data:
-                                tag: "{{ _tag }}"
+                          - choose:
+                              - conditions:
+                                  - condition: template
+                                    value_template: "{{ 'telegram_bot' in repeat.item }}"
+                                sequence:
+                                  - action: telegram_bot.send_message
+                                    data:
+                                      entity_id: "{{ repeat.item }}"
+                                      message: "✅ Tonne ist raus! Bestätigung erhalten – Danke!"
+                                      parse_mode: plain_text
+                              - conditions:
+                                  - condition: template
+                                    value_template: "{{ repeat.item in integration_entities('mobile_app') }}"
+                                sequence:
+                                  - action: >
+                                      notify.mobile_app_{{ device_attr(device_id(repeat.item), 'name')
+                                        | lower | replace('+', '') | replace(' ', '_') }}
+                                    data:
+                                      title: "✅ Tonne ist raus!"
+                                      message: "Bestätigung erhalten – Danke!"
+                                      data:
+                                        tag: "{{ _tag }}"
+                            default:
+                              - action: notify.send_message
+                                target:
+                                  entity_id: "{{ repeat.item }}"
+                                data:
+                                  title: "✅ Tonne ist raus!"
+                                  message: "Bestätigung erhalten – Danke!"
 
 mode: queued
 max: 2

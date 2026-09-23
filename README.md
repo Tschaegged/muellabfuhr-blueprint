@@ -11,7 +11,8 @@ bestätigt hat.
 ```
 18:00 Uhr ──► Benachrichtigung an alle Empfänger
                   ┌─ Companion App: Button „✓ Tonne rausgestellt"
-                  └─ Telegram / andere: Textnachricht
+                  ├─ Telegram: Inline-Button „✓ Tonne rausgestellt"
+                  └─ andere Dienste: Textnachricht
 
     30 min nicht bestätigt ──► Erneute Benachrichtigung (bis max. 4×)
 
@@ -79,8 +80,11 @@ Integration.
   damit bei mehreren Instanzen keine Kreuzbestätigungen auftreten.
 - **Companion App**: Persistente Benachrichtigung mit Bestätigungs-Button.
   Nach Bestätigung wird die Notification durch eine Erfolgsmeldung ersetzt.
-- **Telegram / andere Dienste**: Erhalten die Textnachricht ohne Button. Bestätigung
-  erfolgt über ein Companion-App-Gerät.
+- **Telegram**: Empfänger, deren Notify-Entity `telegram_bot` im Namen trägt, erhalten
+  einen Inline-Button direkt im Chat (`telegram_bot.send_message` + `telegram_callback`).
+  Voraussetzung ist eine eingerichtete Telegram-Bot-Integration.
+- **Andere Dienste**: Erhalten die Textnachricht ohne Button.
+- **Wer zuerst bestätigt** (App oder Telegram), stoppt alle weiteren Erinnerungen.
 - **Morgen-Erinnerung**: Läuft in einer separaten Phase (mode: queued) nach der
   Abend-Schleife, falls diese ohne Bestätigung ausgelaufen ist.
 - **Bestätigungs-Helfer**: Zeigt in Dashboards den aktuellen Status an.
