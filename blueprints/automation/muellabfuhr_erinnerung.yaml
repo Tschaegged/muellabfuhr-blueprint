@@ -216,6 +216,10 @@ actions:
                                   message: "{{ _msg }}"
                                   data:
                                     tag: "{{ _tag }}"
+                                    # Sofort zustellen, auch im Energiesparmodus (Android haelt
+                                    # Nachrichten normaler Prioritaet sonst zurueck)
+                                    priority: high
+                                    ttl: 0
                                     sticky: true
                                     actions:
                                       - action: "{{ _app_action }}"
@@ -282,6 +286,10 @@ actions:
                                       message: "Bestätigung erhalten – Danke!"
                                       data:
                                         tag: "{{ _tag }}"
+                                        # Sofort zustellen, auch im Energiesparmodus (Android haelt
+                                        # Nachrichten normaler Prioritaet sonst zurueck)
+                                        priority: high
+                                        ttl: 0
                             default:
                               - action: notify.send_message
                                 target:
@@ -337,6 +345,10 @@ actions:
                                   message: "{{ _msg }}"
                                   data:
                                     tag: "{{ _tag }}"
+                                    # Sofort zustellen, auch im Energiesparmodus (Android haelt
+                                    # Nachrichten normaler Prioritaet sonst zurueck)
+                                    priority: high
+                                    ttl: 0
                                     sticky: true
                                     actions:
                                       - action: "{{ _app_action }}"
@@ -402,6 +414,10 @@ actions:
                                       message: "Bestätigung erhalten – Danke!"
                                       data:
                                         tag: "{{ _tag }}"
+                                        # Sofort zustellen, auch im Energiesparmodus (Android haelt
+                                        # Nachrichten normaler Prioritaet sonst zurueck)
+                                        priority: high
+                                        ttl: 0
                             default:
                               - action: notify.send_message
                                 target:
