@@ -197,6 +197,7 @@ actions:
                                 value_template: "{{ 'telegram_bot' in repeat.item }}"
                             sequence:
                               - action: telegram_bot.send_message
+                                continue_on_error: true
                                 data:
                                   entity_id: "{{ repeat.item }}"
                                   message: "🗑 {{ _title }}\n{{ _msg }}"
@@ -211,6 +212,7 @@ actions:
                               - action: >
                                   notify.mobile_app_{{ device_attr(device_id(repeat.item), 'name')
                                     | lower | replace('+', '') | replace(' ', '_') }}
+                                continue_on_error: true
                                 data:
                                   title: "{{ _title }}"
                                   message: "{{ _msg }}"
@@ -227,6 +229,7 @@ actions:
                         # Alle anderen → normaler notify
                         default:
                           - action: notify.send_message
+                            continue_on_error: true
                             target:
                               entity_id: "{{ repeat.item }}"
                             data:
@@ -258,6 +261,7 @@ actions:
                           value_template: "{{ wait.trigger.event.event_type == 'telegram_callback' }}"
                       then:
                         - action: telegram_bot.answer_callback_query
+                          continue_on_error: true
                           data:
                             callback_query_id: "{{ wait.trigger.event.data.id }}"
                             message: "✅ Tonne ist raus!"
@@ -270,6 +274,7 @@ actions:
                                     value_template: "{{ 'telegram_bot' in repeat.item }}"
                                 sequence:
                                   - action: telegram_bot.send_message
+                                    continue_on_error: true
                                     data:
                                       entity_id: "{{ repeat.item }}"
                                       message: "✅ Tonne ist raus! Bestätigung erhalten – Danke!"
@@ -281,6 +286,7 @@ actions:
                                   - action: >
                                       notify.mobile_app_{{ device_attr(device_id(repeat.item), 'name')
                                         | lower | replace('+', '') | replace(' ', '_') }}
+                                    continue_on_error: true
                                     data:
                                       title: "✅ Tonne ist raus!"
                                       message: "Bestätigung erhalten – Danke!"
@@ -292,6 +298,7 @@ actions:
                                         ttl: 0
                             default:
                               - action: notify.send_message
+                                continue_on_error: true
                                 target:
                                   entity_id: "{{ repeat.item }}"
                                 data:
@@ -327,6 +334,7 @@ actions:
                                 value_template: "{{ 'telegram_bot' in repeat.item }}"
                             sequence:
                               - action: telegram_bot.send_message
+                                continue_on_error: true
                                 data:
                                   entity_id: "{{ repeat.item }}"
                                   message: "⚠️ {{ _title }}\n{{ _msg }}"
@@ -340,6 +348,7 @@ actions:
                               - action: >
                                   notify.mobile_app_{{ device_attr(device_id(repeat.item), 'name')
                                     | lower | replace('+', '') | replace(' ', '_') }}
+                                continue_on_error: true
                                 data:
                                   title: "⚠️ {{ _title }}"
                                   message: "{{ _msg }}"
@@ -355,6 +364,7 @@ actions:
                                         title: "✓ Tonne rausgestellt"
                         default:
                           - action: notify.send_message
+                            continue_on_error: true
                             target:
                               entity_id: "{{ repeat.item }}"
                             data:
@@ -386,6 +396,7 @@ actions:
                           value_template: "{{ wait.trigger.event.event_type == 'telegram_callback' }}"
                       then:
                         - action: telegram_bot.answer_callback_query
+                          continue_on_error: true
                           data:
                             callback_query_id: "{{ wait.trigger.event.data.id }}"
                             message: "✅ Tonne ist raus!"
@@ -398,6 +409,7 @@ actions:
                                     value_template: "{{ 'telegram_bot' in repeat.item }}"
                                 sequence:
                                   - action: telegram_bot.send_message
+                                    continue_on_error: true
                                     data:
                                       entity_id: "{{ repeat.item }}"
                                       message: "✅ Tonne ist raus! Bestätigung erhalten – Danke!"
@@ -409,6 +421,7 @@ actions:
                                   - action: >
                                       notify.mobile_app_{{ device_attr(device_id(repeat.item), 'name')
                                         | lower | replace('+', '') | replace(' ', '_') }}
+                                    continue_on_error: true
                                     data:
                                       title: "✅ Tonne ist raus!"
                                       message: "Bestätigung erhalten – Danke!"
@@ -420,6 +433,7 @@ actions:
                                         ttl: 0
                             default:
                               - action: notify.send_message
+                                continue_on_error: true
                                 target:
                                   entity_id: "{{ repeat.item }}"
                                 data:
